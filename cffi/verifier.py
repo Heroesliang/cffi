@@ -296,6 +296,8 @@ def _get_so_suffixes():
         # bah, no C_EXTENSION available.  Occurs on pypy without cpyext
         if sys.platform == 'win32':
             suffixes = [".pyd"]
+        elif sys.platform == 'OpenVMS':
+            suffixes = [".exe"]
         else:
             suffixes = [".so"]
 

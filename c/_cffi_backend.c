@@ -9,7 +9,38 @@
 #include "misc_win32.h"
 #else
 #include <stddef.h>
+#ifdef __VMS
+#if __CRTL_VER > 80400000
 #include <stdint.h>
+#else
+typedef signed char             int8_t;
+typedef signed short            int16_t;
+typedef signed int              int32_t;
+typedef signed char             int_least8_t;
+typedef signed short            int_least16_t;
+typedef signed int              int_least32_t;
+typedef signed long long int    int_least64_t;
+typedef signed char             int_fast8_t;
+typedef signed int              int_fast16_t;
+typedef signed int              int_fast32_t;
+typedef signed long long int    int_fast64_t;
+typedef signed long long int    intmax_t;
+typedef unsigned char           uint8_t;
+typedef unsigned short          uint16_t;
+typedef unsigned int            uint32_t;
+typedef unsigned char           uint_least8_t;
+typedef unsigned short          uint_least16_t;
+typedef unsigned int            uint_least32_t;
+typedef unsigned long long int  uint_least64_t;
+typedef unsigned char           uint_fast8_t;
+typedef unsigned int            uint_fast16_t;
+typedef unsigned int            uint_fast32_t;
+typedef unsigned long long int  uint_fast64_t;
+typedef unsigned long long int  uintmax_t;
+#endif
+#else
+#include <stdint.h>
+#endif
 #include <dlfcn.h>
 #include <errno.h>
 #include <ffi.h>
@@ -54,7 +85,38 @@
    typedef unsigned char _Bool;
 # endif
 #else
-# include <stdint.h>
+#ifdef __VMS
+#if __CRTL_VER > 80400000
+#include <stdint.h>
+#else
+typedef signed char             int8_t;
+typedef signed short            int16_t;
+typedef signed int              int32_t;
+typedef signed char             int_least8_t;
+typedef signed short            int_least16_t;
+typedef signed int              int_least32_t;
+typedef signed long long int    int_least64_t;
+typedef signed char             int_fast8_t;
+typedef signed int              int_fast16_t;
+typedef signed int              int_fast32_t;
+typedef signed long long int    int_fast64_t;
+typedef signed long long int    intmax_t;
+typedef unsigned char           uint8_t;
+typedef unsigned short          uint16_t;
+typedef unsigned int            uint32_t;
+typedef unsigned char           uint_least8_t;
+typedef unsigned short          uint_least16_t;
+typedef unsigned int            uint_least32_t;
+typedef unsigned long long int  uint_least64_t;
+typedef unsigned char           uint_fast8_t;
+typedef unsigned int            uint_fast16_t;
+typedef unsigned int            uint_fast32_t;
+typedef unsigned long long int  uint_fast64_t;
+typedef unsigned long long int  uintmax_t;
+#endif
+#else
+#include <stdint.h>
+#endif
 # if (defined (__SVR4) && defined (__sun)) || defined(_AIX) || defined(__hpux)
 #  include <alloca.h>
 # endif
@@ -370,7 +432,12 @@ typedef struct {
 # include "wchar_helper.h"
 #endif
 
+#ifdef __VMS
+// OpenVMS compiler does not support relative #include
+#include "_cffi_errors.h"
+#else
 #include "../cffi/_cffi_errors.h"
+#endif
 
 typedef struct _cffi_allocator_s {
     PyObject *ca_alloc, *ca_free;
@@ -808,7 +875,7 @@ _my_PyLong_AsLongLong(PyObject *ob)
     if (PyInt_Check(ob)) {
         return PyInt_AS_LONG(ob);
     }
-    else 
+    else
 #endif
     if (PyLong_Check(ob)) {
         return PyLong_AsLongLong(ob);
@@ -4316,6 +4383,16 @@ static PyObject *dl_load_function(DynLibObject *dlobj, PyObject *args)
     }
     dlerror();   /* clear error condition */
     funcptr = dlsym(dlobj->dl_handle, funcname);
+#ifdef __VMS
+    // CRTL adds a prefix
+    if (funcptr == NULL) {
+        char *deccName = malloc(strlen(funcname) + 5);
+        strcpy(deccName, "decc$");
+        strcat(deccName, funcname);
+        funcptr = dlsym(dlobj->dl_handle, deccName);
+        free(deccName);
+    }
+#endif
     if (funcptr == NULL) {
         const char *error = dlerror();
         PyErr_Format(PyExc_AttributeError,
@@ -4450,7 +4527,7 @@ static void *b_do_dlopen(PyObject *args, const char **p_printable_filename,
     int flags = 0;
     *p_temp = NULL;
     *auto_close = 1;
-    
+
     if (PyTuple_GET_SIZE(args) == 0 || PyTuple_GET_ITEM(args, 0) == Py_None) {
         PyObject *dummy;
         if (!PyArg_ParseTuple(args, "|Oi:load_library",
@@ -4542,6 +4619,12 @@ static void *b_do_dlopen(PyObject *args, const char **p_printable_filename,
         return NULL;
     }
 #endif
+#ifdef __VMS
+    if (filename_or_null == NULL) {
+        PyErr_SetString(PyExc_OSError, "dlopen(None) not supported on OpenVMS");
+        return NULL;
+    }
+#endif
 
     handle = dlopen(filename_or_null, flags);
     PyMem_Free(filename_or_null);
@@ -4578,7 +4661,7 @@ static PyObject *b_load_library(PyObject *self, PyObject *args)
     dlobj->dl_handle = handle;
     dlobj->dl_name = strdup(printable_filename);
     dlobj->dl_auto_close = auto_close;
- 
+
  error:
     Py_XDECREF(temp);
     return (PyObject *)dlobj;
